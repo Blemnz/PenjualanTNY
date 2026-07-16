@@ -24,6 +24,7 @@ interface NotaData {
   no: string;
   tgl: string;
   sales: string;
+  idToko: string;
   toko: string;
   items: CartItem[];
   total: number;
@@ -46,7 +47,19 @@ function safeSet<T>(key: string, val: T): void {
   }
 }
 
-const DEFAULT_SALES = ["Ardiana", "Cahya", "Fauziah", "Riykan", "Sugiana"];
+const SALES_BY_DEPOT: Record<string, string[]> = {
+  MDJ: ['Sukmara', 'Gugum', 'Asep Aten', 'Amir', 'Fauziah', 'Jafar', 'Cahya', 'Wisnu', 'Dimas', 'Sugiana', 'Kelvin', 'Ryan'],
+  AK: ['Anwar', 'Acep', 'Jajuri', 'Budi', 'Annisa', 'Dede', 'Rian', 'Miftahudin', 'Dendi', 'Febi', 'Irfan', 'Galih', 'Ade', 'Agung', 'Fauzan', 'Niraz'],
+  KOPO: ['Ardiana', 'Albab', 'Riykan', 'Ahmad', 'Febi', 'Zaldi'],
+};
+
+const getSalesForDepot = (depotName: string): string[] => {
+  const normalized = depotName.toUpperCase();
+  if (normalized.includes('MDJ')) return SALES_BY_DEPOT.MDJ;
+  if (normalized.includes('AK')) return SALES_BY_DEPOT.AK;
+  if (normalized.includes('KOPO')) return SALES_BY_DEPOT.KOPO;
+  return [];
+};
 
 const DEFAULT_PRODUCTS: Product[] = [
   { name: 'Rice Crackers', harga: 1700 },
@@ -80,6 +93,7 @@ export default function App() {
   const [fHarga, setFHarga] = useState('');
   const [fQty, setFQty] = useState(1);
   const [fToko, setFToko] = useState('');
+  const [fIdToko, setFIdToko] = useState('');
   const [fSales, setFSales] = useState('');
   const [fSalesCustom, setFSalesCustom] = useState('');
 
@@ -87,7 +101,6 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [sDepot, setSDepot] = useState('Depo MDJ');
   const [sDepotCustom, setSDepotCustom] = useState('');
-  const [sAddr, setSAddr] = useState('');
 
   // Note data state
   const [notaData, setNotaData] = useState<NotaData | null>(null);
@@ -130,6 +143,72 @@ export default function App() {
     return d.getFullYear().toString() + 
            String(d.getMonth() + 1).padStart(2, '0') + 
            String(d.getDate()).padStart(2, '0');
+  };
+
+  const getDepoAddress = (depotName: string) => {
+    const normalized = depotName.toUpperCase();
+    if (normalized.includes('MDJ')) {
+      return 'Jl. AH. Nasution Jl. Raya Sindanglaya No.73, Karang Pamulang, Kec. Mandalajati, Kota Bandung, Jawa Barat 40195';
+    }
+    if (normalized.includes('AK')) {
+      return 'Jl. Rancaekek Majalaya, Solokanjeruk, Kec. Solokanjeruk, Kabupaten Bandung, Jawa Barat 40376';
+    }
+    if (normalized.includes('KOPO')) {
+      return 'Jl. Sadang Sari, Margahayu Tengah, Kec. Margahayu, Kabupaten Bandung, Jawa Barat 40225';
+    }
+    return settings.addr || '';
+  };
+
+  const formatNum = (n: number) => {
+    return Math.round(n).toLocaleString('en-US');
+  };
+
+  const formatItemLine = (qty: number, price: number) => {
+    const left = `${qty} x ${formatNum(price)}`;
+    const right = formatNum(qty * price);
+    const spacesNeeded = 32 - left.length - right.length;
+    const spaces = ' '.repeat(spacesNeeded > 0 ? spacesNeeded : 1);
+    return `${left}${spaces}${right}`;
+  };
+
+  const formatDateTime = (d: Date) => {
+    const Y = d.getFullYear();
+    const M = String(d.getMonth() + 1).padStart(2, '0');
+    const D = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const s = String(d.getSeconds()).padStart(2, '0');
+    return `${Y}-${M}-${D} ${h}:${m}:${s}`;
+  };
+
+  const generateReceiptBodyText = () => {
+    if (!notaData) return '';
+    
+    const lines: string[] = [];
+    lines.push('================================');
+    lines.push(`Tanggal      : ${notaData.tgl}`);
+    lines.push(`Sales        : ${notaData.sales}`);
+    lines.push(`ID Toko      : ${notaData.idToko}`);
+    lines.push(`Toko         : ${notaData.toko}`);
+    lines.push('--------------------------------');
+    
+    notaData.items.forEach((item) => {
+      lines.push(item.name);
+      lines.push(formatItemLine(item.qty, item.harga));
+    });
+    
+    lines.push('--------------------------------');
+    
+    const totalLabel = 'TOTAL';
+    const totalVal = 'Rp ' + formatNum(notaData.total);
+    const totalSpaces = ' '.repeat(Math.max(1, 32 - totalLabel.length - totalVal.length));
+    lines.push(`${totalLabel}${totalSpaces}${totalVal}`);
+    
+    lines.push('--------------------------------');
+    lines.push('Terima kasih');
+    lines.push('================================');
+    
+    return lines.join('\n');
   };
 
   const showToast = (message: string) => {
@@ -238,8 +317,7 @@ export default function App() {
     const notaNo = `${prefixCode}-${key}-${String(nextNum).padStart(3, '0')}`;
 
     const now = new Date();
-    const tglStr = now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) +
-      ' · ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const tglStr = formatDateTime(now);
 
     const total = cartTotal();
 
@@ -247,6 +325,7 @@ export default function App() {
       no: notaNo,
       tgl: tglStr,
       sales: salesName,
+      idToko: fIdToko.trim(),
       toko: toko,
       items: cart,
       total: total
@@ -258,7 +337,6 @@ export default function App() {
 
   // Settings operations
   const openSettings = () => {
-    setSAddr(settings.addr || '');
     const knownDepots = ['Depo MDJ', 'Depo KOPO', 'Depo AK', 'Depo Padalarang'];
     if (knownDepots.includes(settings.depot)) {
       setSDepot(settings.depot);
@@ -274,10 +352,12 @@ export default function App() {
     const depot = sDepot === '__custom' ? (sDepotCustom.trim() || 'Depo') : sDepot;
     const newSettings = {
       depot,
-      addr: sAddr.trim()
+      addr: ''
     };
     setSettings(newSettings);
     safeSet('nota_settings', newSettings);
+    setFSales('');
+    setFSalesCustom('');
     setShowSettings(false);
     showToast('Pengaturan disimpan');
   };
@@ -285,6 +365,7 @@ export default function App() {
   const newNota = () => {
     setCart([]);
     setFToko('');
+    setFIdToko('');
     setFSales('');
     setFSalesCustom('');
     setNotaData(null);
@@ -410,10 +491,19 @@ export default function App() {
               />
             </div>
             <div className="field">
+              <label>ID Toko</label>
+              <input
+                type="text"
+                value={fIdToko}
+                onChange={(e) => setFIdToko(e.target.value)}
+                placeholder="Contoh: 1232"
+              />
+            </div>
+            <div className="field">
               <label>Sales</label>
               <select value={fSales} onChange={(e) => setFSales(e.target.value)}>
                 <option value="">Pilih sales…</option>
-                {DEFAULT_SALES.map((name) => (
+                {getSalesForDepot(settings.depot).map((name) => (
                   <option key={name} value={name}>
                     {name}
                   </option>
@@ -438,53 +528,14 @@ export default function App() {
         /* Nota screen view */
         notaData && (
           <div className="nota-screen-wrap">
-            <div className="nota-card">
+            <div className="nota-card" style={{ padding: '24px 20px' }}>
               <div className="zig-top"></div>
-              <div className="nota-head">
-                <div className="store">{settings.depot || 'Depo MDJ'}</div>
-                {settings.addr && <div className="addr">{settings.addr}</div>}
+              <div className="receipt-header">
+                <div className="receipt-title">PT TNY FOOD Indonesia</div>
+                <div className="receipt-address">{getDepoAddress(settings.depot)}</div>
+                <div className="receipt-phone">Telp: 0811-2233-7772</div>
               </div>
-              <div className="nota-meta">
-                <div className="r">
-                  <span>No. Nota</span>
-                  <span className="mono">{notaData.no}</span>
-                </div>
-                <div className="r">
-                  <span>Tanggal</span>
-                  <span className="mono">{notaData.tgl}</span>
-                </div>
-                <div className="r">
-                  <span>Sales</span>
-                  <span>{notaData.sales}</span>
-                </div>
-                <div className="r">
-                  <span>Toko</span>
-                  <span>{notaData.toko}</span>
-                </div>
-              </div>
-              <div className="dashed"></div>
-              <div className="nota-items">
-                {notaData.items.map((item, i) => (
-                  <div key={i} className="li">
-                    <div className="l">
-                      {item.name}
-                      <span className="qtyline">
-                        {item.qty} x {rupiah(item.harga)}
-                      </span>
-                    </div>
-                    <div className="mono">{rupiah(item.qty * item.harga)}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="dashed"></div>
-              <div className="nota-total">
-                <div className="lbl">TOTAL</div>
-                <div className="val mono">{rupiah(notaData.total)}</div>
-              </div>
-              <div className="nota-foot">
-                Terima kasih atas pesanan Anda
-                <div className="smile">:)</div>
-              </div>
+              <pre className="receipt-text" style={{ marginTop: '0' }}>{generateReceiptBodyText()}</pre>
               <div className="zig-bottom"></div>
             </div>
             <div className="nota-actions">
@@ -554,15 +605,6 @@ export default function App() {
                 />
               </div>
             )}
-            <div className="field">
-              <label>Alamat / keterangan (opsional, muncul di nota)</label>
-              <input
-                type="text"
-                value={sAddr}
-                onChange={(e) => setSAddr(e.target.value)}
-                placeholder="Contoh: Jl. Raya ... , Bandung"
-              />
-            </div>
             <div className="sheet-actions">
               <button className="btn btn-ghost" onClick={() => setShowSettings(false)}>
                 Batal
