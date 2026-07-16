@@ -49,10 +49,31 @@ function safeSet<T>(key: string, val: T): void {
 
 const DEFAULT_SALES = ["Ardiana", "Cahya", "Fauziah", "Riykan", "Sugiana"];
 
+const DEFAULT_PRODUCTS: Product[] = [
+  { name: 'Rice Crackers', harga: 1700, count: 0 },
+  { name: 'Custard Cake', harga: 1700, count: 0 },
+  { name: 'Strawberry Cake', harga: 1700, count: 0 },
+  { name: 'Cake Coklat', harga: 2500, count: 0 },
+  { name: 'Sachima', harga: 1700, count: 0 },
+  { name: 'Shaqima Brown Sugar', harga: 1700, count: 0 },
+  { name: 'Go-Bread Rasa Coklat', harga: 2600, count: 0 },
+  { name: 'Go-Bread Rasa Stroberi', harga: 2600, count: 0 },
+  { name: 'Go-Bread Rasa Custard', harga: 2600, count: 0 },
+  { name: 'Jeli Anggur', harga: 2500, count: 0 },
+  { name: 'Jeli Stroberi', harga: 2500, count: 0 },
+  { name: 'Jeli Mangga', harga: 2500, count: 0 },
+  { name: 'Jelly Milk Tea', harga: 2500, count: 0 },
+  { name: 'Crispy Rice Rasa Pedas', harga: 2100, count: 0 },
+  { name: 'Crispy Rice Rasa Ayam Pedas', harga: 2100, count: 0 }
+];
+
 export default function App() {
   // State variables
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [products, setProducts] = useState<Product[]>(() => safeGet<Product[]>('nota_products', []));
+  const [products, setProducts] = useState<Product[]>(() => {
+    const local = safeGet<Product[]>('nota_products', []);
+    return local.length > 0 ? local : DEFAULT_PRODUCTS;
+  });
   const [settings, setSettings] = useState<Settings>(() => safeGet<Settings>('nota_settings', { depot: 'Depo MDJ', addr: '' }));
   const [counterMap, setCounterMap] = useState<CounterMap>(() => safeGet<CounterMap>('nota_counters', {}));
 
@@ -134,6 +155,14 @@ export default function App() {
     });
   };
 
+  const handleNameChange = (val: string) => {
+    setFName(val);
+    const match = products.find((p) => p.name.toLowerCase() === val.trim().toLowerCase());
+    if (match) {
+      setFHarga(String(match.harga));
+    }
+  };
+
   // Cart operations
   const addItem = () => {
     const name = fName.trim();
@@ -192,7 +221,7 @@ export default function App() {
   const getSortedChips = () => {
     return [...products]
       .sort((a, b) => (b.count || 0) - (a.count || 0))
-      .slice(0, 10);
+      .slice(0, 30);
   };
 
   const handleChipClick = (p: Product) => {
@@ -339,9 +368,15 @@ export default function App() {
                 type="text"
                 ref={nameInputRef}
                 value={fName}
-                onChange={(e) => setFName(e.target.value)}
+                onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="Contoh: Go-Rice Crackers 3pcs"
+                list="product-suggestions"
               />
+              <datalist id="product-suggestions">
+                {products.map((p, i) => (
+                  <option key={i} value={p.name} />
+                ))}
+              </datalist>
             </div>
             <div className="row2">
               <div className="field">
