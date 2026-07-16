@@ -9,7 +9,6 @@ interface CartItem {
 interface Product {
   name: string;
   harga: number;
-  count: number;
 }
 
 interface Settings {
@@ -50,30 +49,26 @@ function safeSet<T>(key: string, val: T): void {
 const DEFAULT_SALES = ["Ardiana", "Cahya", "Fauziah", "Riykan", "Sugiana"];
 
 const DEFAULT_PRODUCTS: Product[] = [
-  { name: 'Rice Crackers', harga: 1700, count: 0 },
-  { name: 'Custard Cake', harga: 1700, count: 0 },
-  { name: 'Strawberry Cake', harga: 1700, count: 0 },
-  { name: 'Cake Coklat', harga: 2500, count: 0 },
-  { name: 'Sachima', harga: 1700, count: 0 },
-  { name: 'Shaqima Brown Sugar', harga: 1700, count: 0 },
-  { name: 'Go-Bread Rasa Coklat', harga: 2600, count: 0 },
-  { name: 'Go-Bread Rasa Stroberi', harga: 2600, count: 0 },
-  { name: 'Go-Bread Rasa Custard', harga: 2600, count: 0 },
-  { name: 'Jeli Anggur', harga: 2500, count: 0 },
-  { name: 'Jeli Stroberi', harga: 2500, count: 0 },
-  { name: 'Jeli Mangga', harga: 2500, count: 0 },
-  { name: 'Jelly Milk Tea', harga: 2500, count: 0 },
-  { name: 'Crispy Rice Rasa Pedas', harga: 2100, count: 0 },
-  { name: 'Crispy Rice Rasa Ayam Pedas', harga: 2100, count: 0 }
+  { name: 'Rice Crackers', harga: 1700 },
+  { name: 'Custard Cake', harga: 1700 },
+  { name: 'Strawberry Cake', harga: 1700 },
+  { name: 'Cake Coklat', harga: 2500 },
+  { name: 'Sachima', harga: 1700 },
+  { name: 'Shaqima Brown Sugar', harga: 1700 },
+  { name: 'Go-Bread Rasa Coklat', harga: 2600 },
+  { name: 'Go-Bread Rasa Stroberi', harga: 2600 },
+  { name: 'Go-Bread Rasa Custard', harga: 2600 },
+  { name: 'Jeli Anggur', harga: 2500 },
+  { name: 'Jeli Stroberi', harga: 2500 },
+  { name: 'Jeli Mangga', harga: 2500 },
+  { name: 'Jelly Milk Tea', harga: 2500 },
+  { name: 'Crispy Rice Rasa Pedas', harga: 2100 },
+  { name: 'Crispy Rice Rasa Ayam Pedas', harga: 2100 }
 ];
 
 export default function App() {
   // State variables
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [products, setProducts] = useState<Product[]>(() => {
-    const local = safeGet<Product[]>('nota_products', []);
-    return local.length > 0 ? local : DEFAULT_PRODUCTS;
-  });
   const [settings, setSettings] = useState<Settings>(() => safeGet<Settings>('nota_settings', { depot: 'Depo MDJ', addr: '' }));
   const [counterMap, setCounterMap] = useState<CounterMap>(() => safeGet<CounterMap>('nota_counters', {}));
 
@@ -102,7 +97,7 @@ export default function App() {
   const toastTimeoutRef = useRef<number | null>(null);
 
   // Refs for element focus
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLSelectElement>(null);
   const hargaInputRef = useRef<HTMLInputElement>(null);
   const qtyInputRef = useRef<HTMLInputElement>(null);
   const tokoInputRef = useRef<HTMLInputElement>(null);
@@ -157,9 +152,11 @@ export default function App() {
 
   const handleNameChange = (val: string) => {
     setFName(val);
-    const match = products.find((p) => p.name.toLowerCase() === val.trim().toLowerCase());
+    const match = DEFAULT_PRODUCTS.find((p) => p.name.toLowerCase() === val.trim().toLowerCase());
     if (match) {
       setFHarga(String(match.harga));
+    } else {
+      setFHarga('');
     }
   };
 
@@ -187,20 +184,6 @@ export default function App() {
     // Add to cart
     setCart((prev) => [...prev, { name, harga, qty }]);
 
-    // Update quick product list
-    setProducts((prevProducts) => {
-      const updated = [...prevProducts];
-      const idx = updated.findIndex((x) => x.name.toLowerCase() === name.toLowerCase());
-      if (idx !== -1) {
-        updated[idx].harga = harga;
-        updated[idx].count = (updated[idx].count || 0) + 1;
-      } else {
-        updated.push({ name, harga, count: 1 });
-      }
-      safeSet('nota_products', updated);
-      return updated;
-    });
-
     // Clear inputs and refocus
     setFName('');
     setFHarga('');
@@ -217,21 +200,7 @@ export default function App() {
     return cart.reduce((s, item) => s + item.harga * item.qty, 0);
   };
 
-  // Quick product chips
-  const getSortedChips = () => {
-    return [...products]
-      .sort((a, b) => (b.count || 0) - (a.count || 0))
-      .slice(0, 30);
-  };
 
-  const handleChipClick = (p: Product) => {
-    setFName(p.name);
-    setFHarga(String(p.harga));
-    setFQty(1);
-    setTimeout(() => {
-      qtyInputRef.current?.focus();
-    }, 50);
-  };
 
   // Generate Receipt
   const generateNota = () => {
@@ -322,8 +291,6 @@ export default function App() {
     setScreen('input');
   };
 
-  const activeChips = getSortedChips();
-
   return (
     <div className="app">
       {/* Top Header */}
@@ -341,42 +308,23 @@ export default function App() {
       {/* Screen Router */}
       {screen === 'input' ? (
         <div className="input-screen-wrap">
-          {/* Quick Product Chips */}
-          <div className="card">
-            <h3>🔥 Produk cepat</h3>
-            <div className="chip-row">
-              {activeChips.length === 0 ? (
-                <div className="chip-empty">
-                  Belum ada produk cepat. Tambahkan item, otomatis tersimpan di sini.
-                </div>
-              ) : (
-                activeChips.map((p, i) => (
-                  <div key={i} className="chip" onClick={() => handleChipClick(p)}>
-                    {p.name} · {rupiah(p.harga)}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
           {/* Add Item Form */}
           <div className="card">
             <h3>➕ Tambah item</h3>
             <div className="field">
               <label>Nama produk</label>
-              <input
-                type="text"
+              <select
                 ref={nameInputRef}
                 value={fName}
                 onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="Contoh: Go-Rice Crackers 3pcs"
-                list="product-suggestions"
-              />
-              <datalist id="product-suggestions">
-                {products.map((p, i) => (
-                  <option key={i} value={p.name} />
+              >
+                <option value="">Pilih produk…</option>
+                {DEFAULT_PRODUCTS.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.name}
+                  </option>
                 ))}
-              </datalist>
+              </select>
             </div>
             <div className="row2">
               <div className="field">
