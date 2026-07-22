@@ -76,7 +76,8 @@ const DEFAULT_PRODUCTS: Product[] = [
   { name: 'Jeli Mangga', harga: 2500 },
   { name: 'Jelly Milk Tea', harga: 2500 },
   { name: 'Crispy Rice Rasa Pedas', harga: 2100 },
-  { name: 'Crispy Rice Rasa Ayam Pedas', harga: 2100 }
+  { name: 'Crispy Rice Rasa Ayam Pedas', harga: 2100 },
+  { name: 'Senbei', harga: 850 }
 ];
 
 export default function App() {
