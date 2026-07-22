@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 
 interface CartItem {
   name: string;
@@ -21,7 +22,10 @@ interface CounterMap {
 }
 
 interface NotaData {
+  id: string;
   no: string;
+  depot?: string;
+  address?: string;
   tgl: string;
   sales: string;
   idToko: string;
@@ -29,6 +33,12 @@ interface NotaData {
   items: CartItem[];
   total: number;
 }
+
+interface ReceiptDownloaderPlugin {
+  savePng(options: { fileName: string; data: string }): Promise<{ uri: string }>;
+}
+
+const ReceiptDownloader = registerPlugin<ReceiptDownloaderPlugin>('ReceiptDownloader');
 
 function safeGet<T>(key: string, fallback: T): T {
   try {
@@ -85,9 +95,10 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [settings, setSettings] = useState<Settings>(() => safeGet<Settings>('nota_settings', { depot: 'Depo MDJ', addr: '' }));
   const [counterMap, setCounterMap] = useState<CounterMap>(() => safeGet<CounterMap>('nota_counters', {}));
+  const [history, setHistory] = useState<NotaData[]>(() => safeGet<NotaData[]>('nota_history', []));
 
   // Screen routing state
-  const [screen, setScreen] = useState<'input' | 'nota'>('input');
+  const [screen, setScreen] = useState<'input' | 'nota' | 'history'>('input');
 
   // Input states
   const [fName, setFName] = useState('');
@@ -187,14 +198,15 @@ export default function App() {
     
     const lines: string[] = [];
     lines.push('================================');
-    lines.push(`Tanggal      : ${notaData.tgl}`);
-    lines.push(`Sales        : ${notaData.sales}`);
-    lines.push(`ID Toko      : ${notaData.idToko}`);
-    lines.push(`Toko         : ${notaData.toko}`);
+    lines.push(`No. Nota     : ${notaData.no || '-'}`);
+    lines.push(`Tanggal      : ${notaData.tgl || '-'}`);
+    lines.push(`Sales        : ${notaData.sales || '-'}`);
+    lines.push(`ID Toko      : ${notaData.idToko || '-'}`);
+    lines.push(`Toko         : ${notaData.toko || '-'}`);
     lines.push('--------------------------------');
     
     notaData.items.forEach((item) => {
-      lines.push(item.name);
+      lines.push(item.name || '-');
       lines.push(formatItemLine(item.qty, item.harga));
     });
     
@@ -210,6 +222,107 @@ export default function App() {
     lines.push('================================');
     
     return lines.join('\n');
+  };
+
+  const downloadNotaImage = async () => {
+    if (!notaData) return;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const scale = 2;
+    const width = 520;
+    const padding = 32;
+    const contentWidth = width - padding * 2;
+    const lineHeight = 24;
+    const wrapText = (text: string, maxWidth: number, font: string) => {
+      ctx.font = font;
+      const words = (text || '-').split(/\s+/);
+      const lines: string[] = [];
+      let line = '';
+      words.forEach((word) => {
+        const candidate = line ? `${line} ${word}` : word;
+        if (line && ctx.measureText(candidate).width > maxWidth) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = candidate;
+        }
+      });
+      if (line) lines.push(line);
+      return lines;
+    };
+    const depotAddress = notaData.address || getDepoAddress(notaData.depot || settings.depot) || '-';
+    const addressLines = wrapText(depotAddress, contentWidth, '15px Arial');
+    const itemNames = notaData.items.map((item) => wrapText(item.name || '-', contentWidth, '17px Arial'));
+    const itemHeight = itemNames.reduce((total, lines) => total + lines.length * lineHeight + 31, 0);
+    const height = 32 + 30 + addressLines.length * 20 + 27 + 14 + 5 * lineHeight + 16 + itemHeight + 18 + 34 + 18 + 24 + 24 + 32;
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    ctx.scale(scale, scale);
+    ctx.fillStyle = '#fffdf8';
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#241812';
+    ctx.textBaseline = 'top';
+    let y = 32;
+    const center = (text: string, font: string) => {
+      ctx.font = font;
+      ctx.fillText(text, (width - ctx.measureText(text).width) / 2, y);
+      y += lineHeight;
+    };
+    const divider = () => {
+      ctx.strokeStyle = '#6f625c';
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath(); ctx.moveTo(padding, y + 8); ctx.lineTo(width - padding, y + 8); ctx.stroke();
+      ctx.setLineDash([]);
+      y += 24;
+    };
+    center('PT TNY FOOD Indonesia', 'bold 21px Arial');
+    addressLines.forEach((line) => { center(line, '15px Arial'); y -= 4; });
+    y += 3;
+    center('Telp: 0811-2233-7772', '15px Arial');
+    y += 10;
+    divider();
+    const detailRows = [
+      ['No. Nota', notaData.no || '-'], ['Tanggal', notaData.tgl || '-'], ['Sales', notaData.sales || '-'],
+      ['ID Toko', notaData.idToko || '-'], ['Toko', notaData.toko || '-']
+    ];
+    ctx.font = '16px Arial';
+    detailRows.forEach(([label, value]) => { ctx.fillText(`${label} : ${value}`, padding, y); y += lineHeight; });
+    divider();
+    notaData.items.forEach((item, index) => {
+      ctx.font = 'bold 17px Arial';
+      itemNames[index].forEach((line) => { ctx.fillText(line, padding, y); y += lineHeight; });
+      ctx.font = '16px Arial';
+      const quantity = `${item.qty || 0} x ${formatNum(item.harga || 0)}`;
+      const subtotal = formatNum((item.qty || 0) * (item.harga || 0));
+      ctx.fillText(quantity, padding, y);
+      ctx.fillText(subtotal, width - padding - ctx.measureText(subtotal).width, y);
+      y += 31;
+    });
+    divider();
+    ctx.font = 'bold 19px Arial';
+    ctx.fillText('TOTAL', padding, y);
+    const totalText = `Rp ${formatNum(notaData.total || 0)}`;
+    ctx.fillText(totalText, width - padding - ctx.measureText(totalText).width, y);
+    y += 34;
+    divider();
+    center('Terima kasih', '16px Arial');
+    const fileName = `nota-${notaData.no}.png`;
+    const imageData = canvas.toDataURL('image/png');
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await ReceiptDownloader.savePng({ fileName, data: imageData });
+        showToast('Gambar disimpan ke folder Download');
+      } catch {
+        showToast('Gagal menyimpan gambar');
+      }
+      return;
+    }
+    const link = document.createElement('a');
+    link.download = fileName;
+    link.href = imageData;
+    link.click();
+    showToast('Gambar nota diunduh');
   };
 
   const showToast = (message: string) => {
@@ -322,15 +435,22 @@ export default function App() {
 
     const total = cartTotal();
 
-    setNotaData({
+    const newNotaData: NotaData = {
+      id: `${notaNo}-${Date.now()}`,
       no: notaNo,
+      depot: settings.depot,
+      address: getDepoAddress(settings.depot),
       tgl: tglStr,
       sales: salesName,
       idToko: fIdToko.trim(),
       toko: toko,
       items: cart,
       total: total
-    });
+    };
+    setNotaData(newNotaData);
+    const updatedHistory = [newNotaData, ...history];
+    setHistory(updatedHistory);
+    safeSet('nota_history', updatedHistory);
 
     setScreen('nota');
     window.scrollTo(0, 0);
@@ -373,6 +493,19 @@ export default function App() {
     setScreen('input');
   };
 
+  const openHistoryNota = (nota: NotaData) => {
+    setNotaData(nota);
+    setScreen('nota');
+    window.scrollTo(0, 0);
+  };
+
+  const deleteHistoryNota = (id: string) => {
+    const updatedHistory = history.filter((nota) => nota.id !== id);
+    setHistory(updatedHistory);
+    safeSet('nota_history', updatedHistory);
+    showToast('Riwayat dihapus');
+  };
+
   return (
     <div className="app">
       {/* Top Header */}
@@ -384,7 +517,10 @@ export default function App() {
             <div className="sub">{brandDate}</div>
           </div>
         </div>
-        <button className="icon-btn" onClick={openSettings} title="Pengaturan">⚙</button>
+        <div className="topbar-actions">
+          <button className="icon-btn" onClick={() => setScreen('history')} title="Riwayat">◷</button>
+          <button className="icon-btn" onClick={openSettings} title="Pengaturan">⚙</button>
+        </div>
       </header>
 
       {/* Screen Router */}
@@ -525,6 +661,29 @@ export default function App() {
             )}
           </div>
         </div>
+      ) : screen === 'history' ? (
+        <div className="history-wrap">
+          <div className="history-heading">
+            <button className="back-btn" onClick={() => setScreen('input')}>Kembali</button>
+            <h2>Riwayat Transaksi</h2>
+          </div>
+          {history.length === 0 ? (
+            <div className="card history-empty">Belum ada transaksi tersimpan.</div>
+          ) : (
+            history.map((nota) => (
+              <div className="card history-item" key={nota.id}>
+                <button className="history-main" onClick={() => openHistoryNota(nota)}>
+                  <span className="history-store">{nota.toko}</span>
+                  <span className="history-meta">{nota.no}<br />{nota.tgl}</span>
+                </button>
+                <div className="history-side">
+                  <strong>{rupiah(nota.total)}</strong>
+                  <button className="history-delete" onClick={() => deleteHistoryNota(nota.id)} aria-label="Hapus riwayat">x</button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       ) : (
         /* Nota screen view */
         notaData && (
@@ -533,7 +692,7 @@ export default function App() {
               <div className="zig-top"></div>
               <div className="receipt-header">
                 <div className="receipt-title">PT TNY FOOD Indonesia</div>
-                <div className="receipt-address">{getDepoAddress(settings.depot)}</div>
+                <div className="receipt-address">{notaData.address || getDepoAddress(notaData.depot || settings.depot) || '-'}</div>
                 <div className="receipt-phone">Telp: 0811-2233-7772</div>
               </div>
               <pre className="receipt-text" style={{ marginTop: '0' }}>{generateReceiptBodyText()}</pre>
@@ -545,6 +704,9 @@ export default function App() {
               </button>
               <button className="btn btn-dark" onClick={() => window.print()}>
                 🖨 Cetak
+              </button>
+              <button className="btn btn-ghost" onClick={downloadNotaImage}>
+                Gambar
               </button>
               <button className="btn btn-primary" onClick={newNota}>
                 Nota Baru

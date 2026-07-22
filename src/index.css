@@ -107,6 +107,21 @@ header.topbar {
   background: rgba(255, 255, 255, 0.32);
 }
 
+.topbar-actions { display: flex; gap: 8px; }
+
+.history-wrap { padding: 4px 0 24px; }
+.history-heading { color: #fff; padding: 0 18px 12px; }
+.history-heading h2 { font-size: 20px; margin: 10px 0 0; }
+.back-btn { border: 0; background: transparent; color: #fff; padding: 4px 0; cursor: pointer; font-weight: 700; }
+.history-item { display: flex; align-items: center; gap: 10px; padding: 13px 14px; }
+.history-main { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; padding: 0; color: var(--ink); cursor: pointer; }
+.history-store, .history-meta { display: block; }
+.history-store { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.history-meta { color: var(--ink-soft); font-size: 11px; line-height: 1.45; }
+.history-side { text-align: right; font-size: 13px; white-space: nowrap; }
+.history-delete { margin: 7px 0 0 auto; display: block; border: 0; background: #fdeeee; color: var(--red); width: 25px; height: 25px; border-radius: 8px; cursor: pointer; font-size: 17px; }
+.history-empty { text-align: center; color: var(--ink-soft); padding: 28px 16px; }
+
 /* ---------- CARD ---------- */
 .card {
   background: var(--white);

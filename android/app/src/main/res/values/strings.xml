@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nota Digital TNY</string>
+    <string name="title_activity_main">Nota Digital TNY</string>
+    <string name="package_name">com.tnyfood.notadigital</string>
+    <string name="custom_url_scheme">com.tnyfood.notadigital</string>
+</resources>
