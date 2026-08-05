@@ -3,18 +3,22 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 
 interface CartItem {
   name: string;
+  namaCn?: string;
   harga: number;
   qty: number;
 }
 
 interface Product {
   name: string;
+  namaCn?: string;
   harga: number;
 }
 
 interface Settings {
   depot: string;
   addr: string;
+  printerName?: string;
+  printerAddress?: string;
 }
 
 interface CounterMap {
@@ -38,7 +42,14 @@ interface ReceiptDownloaderPlugin {
   savePng(options: { fileName: string; data: string }): Promise<{ uri: string }>;
 }
 
+interface ThermalPrinterPlugin {
+  requestBluetoothPermissions(): Promise<void>;
+  listPairedDevices(): Promise<{ devices: Array<{ name: string; address: string }> }>;
+  print(options: { address: string; text: string }): Promise<void>;
+}
+
 const ReceiptDownloader = registerPlugin<ReceiptDownloaderPlugin>('ReceiptDownloader');
+const ThermalPrinter = registerPlugin<ThermalPrinterPlugin>('ThermalPrinter');
 
 function safeGet<T>(key: string, fallback: T): T {
   try {
@@ -72,28 +83,28 @@ const getSalesForDepot = (depotName: string): string[] => {
 };
 
 const DEFAULT_PRODUCTS: Product[] = [
-  { name: 'Rice Crackers', harga: 1700 },
-  { name: 'Custard Cake', harga: 1700 },
-  { name: 'Strawberry Cake', harga: 1700 },
-  { name: 'Cake Coklat', harga: 2500 },
-  { name: 'Sachima', harga: 1700 },
-  { name: 'Shaqima Brown Sugar', harga: 1700 },
-  { name: 'Go-Bread Rasa Coklat', harga: 2600 },
-  { name: 'Go-Bread Rasa Stroberi', harga: 2600 },
-  { name: 'Go-Bread Rasa Custard', harga: 2600 },
-  { name: 'Jeli Anggur', harga: 2500 },
-  { name: 'Jeli Stroberi', harga: 2500 },
-  { name: 'Jeli Mangga', harga: 2500 },
-  { name: 'Jelly Milk Tea', harga: 2500 },
+  { name: 'Rice Crackers', namaCn: '雪米饼', harga: 1700 },
+  { name: 'Custard Cake', namaCn: '蛋黄派', harga: 1700 },
+  { name: 'Strawberry Cake', namaCn: '草莓派', harga: 1700 },
+  { name: 'Cake Coklat', namaCn: '巧克力派', harga: 2500 },
+  { name: 'Sachima', namaCn: '沙琪玛', harga: 1700 },
+  { name: 'Shaqima Brown Sugar', namaCn: '黑糖沙琪玛', harga: 1700 },
+  { name: 'Go-Bread Rasa Coklat', namaCn: '巧克力面包', harga: 2600 },
+  { name: 'Go-Bread Rasa Stroberi', namaCn: '草莓面包', harga: 2600 },
+  { name: 'Go-Bread Rasa Custard', namaCn: '香草面包', harga: 2600 },
+  { name: 'Jeli Anggur', namaCn: '葡萄味吸吸果冻', harga: 2500 },
+  { name: 'Jeli Stroberi', namaCn: '草莓味吸吸果冻', harga: 2500 },
+  { name: 'Jeli Mangga', namaCn: '芒果味吸吸果冻', harga: 2500 },
+  { name: 'Jelly Milk Tea', namaCn: '奶茶味吸吸果冻', harga: 2500 },
   { name: 'Crispy Rice Rasa Pedas', harga: 2100 },
   { name: 'Crispy Rice Rasa Ayam Pedas', harga: 2100 },
-  { name: 'Senbei', harga: 850 }
+  { name: 'Senbei', namaCn: '仙贝', harga: 850 }
 ];
 
 export default function App() {
   // State variables
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [settings, setSettings] = useState<Settings>(() => safeGet<Settings>('nota_settings', { depot: 'Depo MDJ', addr: '' }));
+  const [settings, setSettings] = useState<Settings>(() => safeGet<Settings>('nota_settings', { depot: 'Depo MDJ', addr: '', printerName: '', printerAddress: '' }));
   const [counterMap, setCounterMap] = useState<CounterMap>(() => safeGet<CounterMap>('nota_counters', {}));
   const [history, setHistory] = useState<NotaData[]>(() => safeGet<NotaData[]>('nota_history', []));
 
@@ -113,6 +124,10 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [sDepot, setSDepot] = useState('Depo MDJ');
   const [sDepotCustom, setSDepotCustom] = useState('');
+  const [sPrinterName, setSPrinterName] = useState('');
+  const [sPrinterAddress, setSPrinterAddress] = useState('');
+  const [pairedPrinters, setPairedPrinters] = useState<Array<{ name: string; address: string }>>([]);
+  const [isSearchingPrinter, setIsSearchingPrinter] = useState(false);
 
   // Note data state
   const [notaData, setNotaData] = useState<NotaData | null>(null);
@@ -183,6 +198,29 @@ export default function App() {
     return `${left}${spaces}${right}`;
   };
 
+  const wrapTextForPrinter = (text: string, maxWidth: number): string[] => {
+    const words = text.split(/\s+/);
+    const lines: string[] = [];
+    let currentLine = '';
+    words.forEach((word) => {
+      if (currentLine.length === 0) {
+        currentLine = word;
+      } else if (currentLine.length + 1 + word.length <= maxWidth) {
+        currentLine += ' ' + word;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+      }
+    });
+    if (currentLine) lines.push(currentLine);
+    return lines;
+  };
+
+  const centerLine = (text: string, width: number): string => {
+    const pad = Math.max(0, Math.floor((width - text.length) / 2));
+    return ' '.repeat(pad) + text;
+  };
+
   const formatDateTime = (d: Date) => {
     const Y = d.getFullYear();
     const M = String(d.getMonth() + 1).padStart(2, '0');
@@ -206,7 +244,8 @@ export default function App() {
     lines.push('--------------------------------');
     
     notaData.items.forEach((item) => {
-      lines.push(item.name || '-');
+      const displayName = item.namaCn ? `${item.namaCn} ${item.name}` : (item.name || '-');
+      lines.push(displayName);
       lines.push(formatItemLine(item.qty, item.harga));
     });
     
@@ -253,9 +292,12 @@ export default function App() {
     };
     const depotAddress = notaData.address || getDepoAddress(notaData.depot || settings.depot) || '-';
     const addressLines = wrapText(depotAddress, contentWidth, '15px Arial');
-    const itemNames = notaData.items.map((item) => wrapText(item.name || '-', contentWidth, '17px Arial'));
+    const itemNames = notaData.items.map((item) => {
+      const displayName = item.namaCn ? `${item.namaCn} ${item.name}` : (item.name || '-');
+      return wrapText(displayName, contentWidth, '17px Arial');
+    });
     const itemHeight = itemNames.reduce((total, lines) => total + lines.length * lineHeight + 31, 0);
-    const height = 32 + 30 + addressLines.length * 20 + 27 + 14 + 5 * lineHeight + 16 + itemHeight + 18 + 34 + 18 + 24 + 24 + 32;
+    const height = 32 + 30 + addressLines.length * 20 + 27 + 14 + 20 + 5 * lineHeight + 16 + itemHeight + 18 + 34 + 18 + 24 + 24 + 32;
     canvas.width = width * scale;
     canvas.height = height * scale;
     ctx.scale(scale, scale);
@@ -280,6 +322,8 @@ export default function App() {
     addressLines.forEach((line) => { center(line, '15px Arial'); y -= 4; });
     y += 3;
     center('Telp: 0811-2233-7772', '15px Arial');
+    y -= 4;
+    center('TikTok: @tny_goday_bdg', '15px Arial');
     y += 10;
     divider();
     const detailRows = [
@@ -375,7 +419,9 @@ export default function App() {
     }
 
     // Add to cart
-    setCart((prev) => [...prev, { name, harga, qty }]);
+    const matchedProduct = DEFAULT_PRODUCTS.find((p) => p.name.toLowerCase() === name.toLowerCase());
+    const namaCn = matchedProduct?.namaCn;
+    setCart((prev) => [...prev, { name, namaCn, harga, qty }]);
 
     // Clear inputs and refocus
     setFName('');
@@ -466,14 +512,82 @@ export default function App() {
       setSDepot('__custom');
       setSDepotCustom(settings.depot || '');
     }
+    setSPrinterName(settings.printerName || '');
+    setSPrinterAddress(settings.printerAddress || '');
+    setPairedPrinters([]);
     setShowSettings(true);
+  };
+
+  const findPairedPrinters = async () => {
+    if (!Capacitor.isNativePlatform()) {
+      showToast('Koneksi Bluetooth tersedia pada aplikasi Android');
+      return;
+    }
+    setIsSearchingPrinter(true);
+    try {
+      await ThermalPrinter.requestBluetoothPermissions();
+      const result = await ThermalPrinter.listPairedDevices();
+      setPairedPrinters(result.devices || []);
+      if ((result.devices || []).length === 0) showToast('Belum ada printer yang dipasangkan');
+    } catch {
+      showToast('Bluetooth belum diizinkan atau tidak tersedia');
+    } finally {
+      setIsSearchingPrinter(false);
+    }
+  };
+
+  const printThermalReceipt = async () => {
+    if (!notaData) return;
+    if (!Capacitor.isNativePlatform()) {
+      window.print();
+      return;
+    }
+    if (!settings.printerAddress) {
+      showToast('Pilih printer thermal di Pengaturan');
+      return;
+    }
+    try {
+      await ThermalPrinter.requestBluetoothPermissions();
+      const PW = 32; // printer width in chars
+      const headerLines: string[] = [];
+      headerLines.push(centerLine('PT TNY FOOD Indonesia', PW));
+      const address = notaData.address || getDepoAddress(notaData.depot || settings.depot);
+      const addrWrapped = wrapTextForPrinter(address, PW);
+      addrWrapped.forEach((line) => headerLines.push(centerLine(line, PW)));
+      headerLines.push(centerLine('Telp: 0811-2233-7772', PW));
+      headerLines.push(centerLine('TikTok: @tny_goday_bdg', PW));
+      const headerText = headerLines.join('\n');
+      await ThermalPrinter.print({
+        address: settings.printerAddress,
+        text: `${headerText}\n${generateReceiptBodyText()}`
+      });
+      showToast(`Nota terkirim ke ${settings.printerName || 'printer thermal'}`);
+    } catch {
+      showToast('Gagal terhubung ke printer thermal');
+    }
+  };
+
+  const testThermalPrinter = async () => {
+    if (!sPrinterAddress) {
+      showToast('Pilih printer terlebih dahulu');
+      return;
+    }
+    try {
+      await ThermalPrinter.requestBluetoothPermissions();
+      await ThermalPrinter.print({ address: sPrinterAddress, text: 'PT TNY FOOD Indonesia\n\nTes koneksi printer berhasil.\n\n' });
+      showToast('Tes cetak berhasil dikirim');
+    } catch {
+      showToast('Tes cetak gagal');
+    }
   };
 
   const saveSettings = () => {
     const depot = sDepot === '__custom' ? (sDepotCustom.trim() || 'Depo') : sDepot;
     const newSettings = {
       depot,
-      addr: ''
+      addr: '',
+      printerName: sPrinterName,
+      printerAddress: sPrinterAddress
     };
     setSettings(newSettings);
     safeSet('nota_settings', newSettings);
@@ -537,9 +651,10 @@ export default function App() {
                 onChange={(e) => handleNameChange(e.target.value)}
               >
                 <option value="">Pilih produk…</option>
+                {/* Crispy Rice products have no Chinese name */}
                 {DEFAULT_PRODUCTS.map((p) => (
                   <option key={p.name} value={p.name}>
-                    {p.name}
+                    {p.namaCn ? `${p.namaCn} ${p.name}` : p.name}
                   </option>
                 ))}
               </select>
@@ -601,7 +716,7 @@ export default function App() {
                 cart.map((item, idx) => (
                   <div key={idx} className="cart-item">
                     <div className="info">
-                      <div className="pname">{item.name}</div>
+                      <div className="pname">{item.namaCn ? `${item.namaCn} ${item.name}` : item.name}</div>
                       <div className="pmeta">
                         {item.qty} x {rupiah(item.harga)}
                       </div>
@@ -694,6 +809,7 @@ export default function App() {
                 <div className="receipt-title">PT TNY FOOD Indonesia</div>
                 <div className="receipt-address">{notaData.address || getDepoAddress(notaData.depot || settings.depot) || '-'}</div>
                 <div className="receipt-phone">Telp: 0811-2233-7772</div>
+                <div className="receipt-tiktok">TikTok: @tny_goday_bdg</div>
               </div>
               <pre className="receipt-text" style={{ marginTop: '0' }}>{generateReceiptBodyText()}</pre>
               <div className="zig-bottom"></div>
@@ -702,7 +818,7 @@ export default function App() {
               <button className="btn btn-ghost" onClick={() => setScreen('input')}>
                 ← Edit
               </button>
-              <button className="btn btn-dark" onClick={() => window.print()}>
+              <button className="btn btn-dark" onClick={printThermalReceipt}>
                 🖨 Cetak
               </button>
               <button className="btn btn-ghost" onClick={downloadNotaImage}>
@@ -768,6 +884,31 @@ export default function App() {
                 />
               </div>
             )}
+            <div className="printer-settings">
+              <div className="printer-heading">
+                <div>
+                  <label>Printer thermal Bluetooth</label>
+                  <p>Pasangkan printer terlebih dahulu melalui Pengaturan Bluetooth Android.</p>
+                </div>
+                <button className="btn btn-ghost btn-compact" onClick={findPairedPrinters} disabled={isSearchingPrinter}>
+                  {isSearchingPrinter ? 'Mencari...' : 'Cari printer'}
+                </button>
+              </div>
+              {sPrinterAddress && <div className="selected-printer">Terpilih: {sPrinterName || sPrinterAddress}</div>}
+              {pairedPrinters.length > 0 && (
+                <div className="printer-list">
+                  {pairedPrinters.map((printer) => (
+                    <button type="button" className={`printer-option ${sPrinterAddress === printer.address ? 'selected' : ''}`} key={printer.address} onClick={() => {
+                      setSPrinterName(printer.name);
+                      setSPrinterAddress(printer.address);
+                    }}>
+                      <span>{printer.name}</span><small>{printer.address}</small>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {sPrinterAddress && <button className="btn btn-ghost test-printer" onClick={testThermalPrinter}>Tes cetak</button>}
+            </div>
             <div className="sheet-actions">
               <button className="btn btn-ghost" onClick={() => setShowSettings(false)}>
                 Batal
