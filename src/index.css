@@ -76,6 +76,16 @@ header.topbar {
   box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12);
 }
 
+.brand-logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--yellow);
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
 .brand-text .name {
   font-family: 'Baloo 2';
   font-weight: 700;

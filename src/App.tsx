@@ -114,7 +114,7 @@ export default function App() {
   // Input states
   const [fName, setFName] = useState('');
   const [fHarga, setFHarga] = useState('');
-  const [fQty, setFQty] = useState(1);
+  const [fQty, setFQty] = useState('0');
   const [fToko, setFToko] = useState('');
   const [fIdToko, setFIdToko] = useState('');
   const [fSales, setFSales] = useState('');
@@ -198,6 +198,24 @@ export default function App() {
     return `${left}${spaces}${right}`;
   };
 
+  const getVisualWidth = (str: string): number => {
+    let width = 0;
+    for (let i = 0; i < str.length; i++) {
+      const code = str.charCodeAt(i);
+      if (
+        (code >= 0x4e00 && code <= 0x9fff) ||
+        (code >= 0x3400 && code <= 0x4dbf) ||
+        (code >= 0xf900 && code <= 0xfaff) ||
+        (code >= 0xff00 && code <= 0xffef)
+      ) {
+        width += 2;
+      } else {
+        width += 1;
+      }
+    }
+    return width;
+  };
+
   const wrapTextForPrinter = (text: string, maxWidth: number): string[] => {
     const words = text.split(/\s+/);
     const lines: string[] = [];
@@ -205,7 +223,7 @@ export default function App() {
     words.forEach((word) => {
       if (currentLine.length === 0) {
         currentLine = word;
-      } else if (currentLine.length + 1 + word.length <= maxWidth) {
+      } else if (getVisualWidth(currentLine) + 1 + getVisualWidth(word) <= maxWidth) {
         currentLine += ' ' + word;
       } else {
         lines.push(currentLine);
@@ -217,7 +235,8 @@ export default function App() {
   };
 
   const centerLine = (text: string, width: number): string => {
-    const pad = Math.max(0, Math.floor((width - text.length) / 2));
+    const vWidth = getVisualWidth(text);
+    const pad = Math.max(0, Math.floor((width - vWidth) / 2));
     return ' '.repeat(pad) + text;
   };
 
@@ -245,7 +264,8 @@ export default function App() {
     
     notaData.items.forEach((item) => {
       const displayName = item.namaCn ? `${item.namaCn} ${item.name}` : (item.name || '-');
-      lines.push(displayName);
+      const itemLines = wrapTextForPrinter(displayName, 32);
+      itemLines.forEach((l) => lines.push(l));
       lines.push(formatItemLine(item.qty, item.harga));
     });
     
@@ -382,8 +402,10 @@ export default function App() {
   // Quantity control
   const stepQty = (delta: number) => {
     setFQty((prev) => {
-      const next = prev + delta;
-      return next < 1 ? 1 : next;
+      const num = parseInt(prev, 10);
+      const current = isNaN(num) ? 0 : num;
+      const next = current + delta;
+      return String(next < 0 ? 0 : next);
     });
   };
 
@@ -401,7 +423,7 @@ export default function App() {
   const addItem = () => {
     const name = fName.trim();
     const harga = parseFloat(fHarga);
-    const qty = fQty;
+    const qty = parseInt(fQty, 10);
 
     if (!name) {
       showToast('Nama produk belum diisi');
@@ -413,8 +435,9 @@ export default function App() {
       hargaInputRef.current?.focus();
       return;
     }
-    if (qty <= 0) {
-      showToast('Qty tidak valid');
+    if (isNaN(qty) || qty <= 0) {
+      showToast('Qty harus lebih dari 0');
+      qtyInputRef.current?.focus();
       return;
     }
 
@@ -426,7 +449,7 @@ export default function App() {
     // Clear inputs and refocus
     setFName('');
     setFHarga('');
-    setFQty(1);
+    setFQty('0');
     showToast('Item ditambahkan');
     nameInputRef.current?.focus();
   };
@@ -603,6 +626,7 @@ export default function App() {
     setFIdToko('');
     setFSales('');
     setFSalesCustom('');
+    setFQty('0');
     setNotaData(null);
     setScreen('input');
   };
@@ -625,7 +649,7 @@ export default function App() {
       {/* Top Header */}
       <header className="topbar">
         <div className="brand">
-          <div className="brand-badge">:)</div>
+          <img src="/logo.jpg" alt="TNY Food" className="brand-logo" />
           <div className="brand-text">
             <div className="name">{settings.depot || 'Depo MDJ'}</div>
             <div className="sub">{brandDate}</div>
@@ -680,11 +704,8 @@ export default function App() {
                     ref={qtyInputRef}
                     id="fQty"
                     value={fQty}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10);
-                      setFQty(isNaN(v) || v < 1 ? 1 : v);
-                    }}
-                    min="1"
+                    onChange={(e) => setFQty(e.target.value)}
+                    min="0"
                     inputMode="numeric"
                   />
                   <button type="button" onClick={() => stepQty(1)}>+</button>

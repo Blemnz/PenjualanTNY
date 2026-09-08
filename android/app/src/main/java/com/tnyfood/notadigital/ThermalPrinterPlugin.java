@@ -15,7 +15,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.util.Set;
 import java.util.UUID;
 
@@ -86,12 +86,20 @@ public class ThermalPrinterPlugin extends Plugin {
             socket = device.createRfcommSocketToServiceRecord(SPP_UUID);
             socket.connect();
             OutputStream output = socket.getOutputStream();
+            
+            // ESC @ (Initialize printer)
             output.write(new byte[] {0x1B, 0x40});
-            output.write(text.replace("\n", "\r\n").getBytes(StandardCharsets.UTF_8));
+            // FS & (Enable Chinese mode) & FS C 1 (Set GBK character code)
+            output.write(new byte[] {0x1C, 0x26, 0x1C, 0x43, 0x01});
+            
+            // Encode string using GBK character set
+            output.write(text.replace("\n", "\r\n").getBytes(Charset.forName("GBK")));
+            
+            // Paper feed & cut
             output.write(new byte[] {0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x00});
             output.flush();
             call.resolve();
-        } catch (Exception error) { call.reject("Tidak dapat mencetak ke printer", error); }
+        } catch (Exception error) { call.reject("Tidak dapat mencetak ke printer: " + error.getMessage(), error); }
         finally { if (socket != null) try { socket.close(); } catch (Exception ignored) { } }
     }
 }

@@ -1,11 +1,15 @@
 {
   "name": "nota-digital",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:android": "tsc -b && vite build && npx cap sync",
+    "cap:sync": "npx cap sync",
+    "cap:open": "npx cap open android",
+    "cap:run": "npx cap run android",
     "lint": "oxlint",
     "preview": "vite preview"
   },
