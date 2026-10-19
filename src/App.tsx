@@ -97,8 +97,7 @@ const DEFAULT_PRODUCTS: Product[] = [
   { name: 'Jeli Mangga', namaCn: '芒果味吸吸果冻', harga: 2500 },
   { name: 'Jelly Milk Tea', namaCn: '奶茶味吸吸果冻', harga: 2500 },
   { name: 'Crispy Rice Rasa Pedas', harga: 2100 },
-  { name: 'Crispy Rice Rasa Ayam Pedas', harga: 2100 },
-  { name: 'Senbei', namaCn: '仙贝', harga: 850 }
+  { name: 'Crispy Rice Rasa Ayam Pedas', harga: 2100 }
 ];
 
 export default function App() {
@@ -167,9 +166,9 @@ export default function App() {
 
   const todayKey = () => {
     const d = new Date();
-    return d.getFullYear().toString() + 
-           String(d.getMonth() + 1).padStart(2, '0') + 
-           String(d.getDate()).padStart(2, '0');
+    return d.getFullYear().toString() +
+      String(d.getMonth() + 1).padStart(2, '0') +
+      String(d.getDate()).padStart(2, '0');
   };
 
   const getDepoAddress = (depotName: string) => {
@@ -252,7 +251,7 @@ export default function App() {
 
   const generateReceiptBodyText = () => {
     if (!notaData) return '';
-    
+
     const lines: string[] = [];
     lines.push('================================');
     lines.push(`No. Nota     : ${notaData.no || '-'}`);
@@ -261,25 +260,25 @@ export default function App() {
     lines.push(`ID Toko      : ${notaData.idToko || '-'}`);
     lines.push(`Toko         : ${notaData.toko || '-'}`);
     lines.push('--------------------------------');
-    
+
     notaData.items.forEach((item) => {
       const displayName = item.namaCn ? `${item.namaCn} ${item.name}` : (item.name || '-');
       const itemLines = wrapTextForPrinter(displayName, 32);
       itemLines.forEach((l) => lines.push(l));
       lines.push(formatItemLine(item.qty, item.harga));
     });
-    
+
     lines.push('--------------------------------');
-    
+
     const totalLabel = 'TOTAL';
     const totalVal = 'Rp ' + formatNum(notaData.total);
     const totalSpaces = ' '.repeat(Math.max(1, 32 - totalLabel.length - totalVal.length));
     lines.push(`${totalLabel}${totalSpaces}${totalVal}`);
-    
+
     lines.push('--------------------------------');
     lines.push('Terima kasih');
     lines.push('================================');
-    
+
     return lines.join('\n');
   };
 
