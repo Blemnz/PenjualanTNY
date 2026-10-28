@@ -70,7 +70,7 @@ function safeSet<T>(key: string, val: T): void {
 
 const SALES_BY_DEPOT: Record<string, string[]> = {
   MDJ: ['Sukmara', 'Gugum', 'Asep Aten', 'Amir', 'Fauziah', 'Jafar', 'Cahya', 'Wisnu', 'Dimas', 'Sugiana', 'Kelvin', 'Ryan'],
-  AK: ['Anwar', 'Acep', 'Jajuri', 'Budi', 'Annisa', 'Dede', 'Rian', 'Miftahudin', 'Dendi', 'Febi', 'Irfan', 'Galih', 'Ade', 'Agung', 'Fauzan', 'Niraz'],
+  AK: ['Anwar', 'Asep.R', 'Gilang', 'Budi', 'Naufal', 'Dede', 'Rian', 'Yayan', 'Dendi', 'Febi', 'Irfan', 'Galih', 'Ridho', 'Agung', 'Gigih', 'Hafidzul'],
   KOPO: ['Ardiana', 'Albab', 'Riykan', 'Ahmad', 'Febi', 'Zaldi'],
 };
 
@@ -87,6 +87,7 @@ const DEFAULT_PRODUCTS: Product[] = [
   { name: 'Custard Cake', namaCn: '蛋黄派', harga: 1700 },
   { name: 'Strawberry Cake', namaCn: '草莓派', harga: 1700 },
   { name: 'Cake Coklat', namaCn: '巧克力派', harga: 2500 },
+  { name: 'Go Pie Strawberry Cake', namaCn: '草莓流心派', harga: 2600 },
   { name: 'Sachima', namaCn: '沙琪玛', harga: 1700 },
   { name: 'Shaqima Brown Sugar', namaCn: '黑糖沙琪玛', harga: 1700 },
   { name: 'Go-Bread Rasa Coklat', namaCn: '巧克力面包', harga: 2600 },
