@@ -87,7 +87,7 @@ const DEFAULT_PRODUCTS: Product[] = [
   { name: 'Custard Cake', namaCn: '蛋黄派', harga: 1700 },
   { name: 'Strawberry Cake', namaCn: '草莓派', harga: 1700 },
   { name: 'Cake Coklat', namaCn: '巧克力派', harga: 2500 },
-  { name: 'Go Pie Strawberry Cake', namaCn: '草莓流心派', harga: 2600 },
+  { name: 'Go Pie Strawberry Cake', namaCn: '草莓流心派', harga: 2500 },
   { name: 'Sachima', namaCn: '沙琪玛', harga: 1700 },
   { name: 'Shaqima Brown Sugar', namaCn: '黑糖沙琪玛', harga: 1700 },
   { name: 'Go-Bread Rasa Coklat', namaCn: '巧克力面包', harga: 2600 },
